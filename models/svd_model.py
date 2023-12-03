@@ -4,8 +4,6 @@ import sys
 PROJECT_PATH = os.sep + os.path.join(*__file__.split(os.sep)[:-2])
 os.chdir(PROJECT_PATH)
 sys.path.append(PROJECT_PATH)
-print(PROJECT_PATH)
-print(os.getcwd())
 
 
 from surprise import SVD, dump, accuracy
@@ -16,6 +14,17 @@ from utils.prepare_data import process_rating_table
 
 
 def get_recommendations(user_id, movies_table, model, n=5):
+    """Get movie recommendations for specific user
+
+    Params:
+        user_id (int): user id
+        movies_table (pd.Dataframe): dataframe with movies info
+        model: fitted model
+        n (int): number of recommendations
+
+    Returns:
+    tuple of title, movie_id, estimated rating
+    """
     # user_id film_id rating
     ratings = process_rating_table("data/raw/u.data")
 
@@ -36,20 +45,34 @@ def get_recommendations(user_id, movies_table, model, n=5):
 
     for i in range(n):
         raw = movies_table[movies_table["movie_id"] == predictions_sorted[i].iid]
-        results.append(raw)
+        title = raw["title"].values[0]
+        results.append((title, predictions_sorted[i].iid, predictions_sorted[i].est))
 
     return results
 
 
 def get_model(path_to_model="models/svd_saved.dump"):
+    """Load the model from memory"""
     assert os.path.exists(path_to_model), "please, train and save the model before"
-    _, model = dump.load()
+    _, model = dump.load(path_to_model)
     return model
 
 
-def train(train_dataset, use_grid_search=False, path_to_save=None):
+def train(train_dataset, dataset=None, use_grid_search=False, path_to_save=None):
+    """Train the model and save it, if path is specified
+
+    Params:
+        train_dataset: dataset to train on
+        dataset: initial unsplitted dataset (only needed for grid_search)
+        use_grid_search (bool): use grid search or not
+        path_to_save (str): path to save the model
+
+    Returns:
+        model: fitted model
+    """
     model = SVD()
     if use_grid_search:
+        print("start grid search")
         param_grid = {
             "n_factors": [25, 50, 100],  # The number of factors
             "n_epochs": [20, 30, 40],  # The number of iteration of the SGD procedure
@@ -57,10 +80,11 @@ def train(train_dataset, use_grid_search=False, path_to_save=None):
             "reg_all": [0.02, 0.05, 0.1],  # The regularization term for all parameters
         }
         gs = GridSearchCV(SVD, param_grid, measures=["rmse"], cv=5, n_jobs=4)
+        gs.fit(dataset)
         model = gs.best_estimator["rmse"]
     model.fit(train_dataset)
 
-    if not path_to_save:
+    if path_to_save:
         dump.dump(path_to_save, algo=model)
 
     return model
@@ -75,7 +99,7 @@ def eval(model, test_dataset, k=5, threshold=3.5):
         k (int): number of top predicted items
         threshold (float): threshold to consider if item is recommended or not and also to consider relevant items
 
-    Returns
+    Returns:
         rmse (float): Root Mean Squared Error
         avg_precision_at_k (float): average precision at k metrics
         avg_recall_at_k (float): average recall at k metrics
@@ -94,6 +118,10 @@ def precision_recall_at_k(predictions, k=10, threshold=3.5):
     Params:
         k (int): number of top predicted items
         threshold (float): threshold to consider if item is recommended or not and also to consider relevant items
+
+     Returns:
+        avg_precision_at_k (float): average precision at k metrics
+        avg_recall_at_k (float): average recall at k metrics
 
     Reference:https://surprise.readthedocs.io/en/stable/FAQ.html?highlight=precision#how-to-compute-precision-k-and-recall-k
     """
