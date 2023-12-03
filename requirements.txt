@@ -1,0 +1,14 @@
+name: pmldl-recsys
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - jupyter
+  - pandas=2.1.1
+  - nltk=3.8.1
+  - seaborn=0.12.2
+  - scikit-learn=1.3.0
+  - numpy=1.26.2
+  - surprise=0.1
+  - scikit-surprise=1.1.3
+prefix: /home/said/anaconda3/envs/pmldl-recsys
